@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+neo4j
+openai
+ezdxf
+pandas
+python-multipart 

@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1
+
+# ---------------------------------------------------------------------------
+# Using existing libredwg-full image
+# ---------------------------------------------------------------------------
+FROM libredwg-full:latest AS libredwg
+
+# ---------------------------------------------------------------------------
+# Final runtime image – Python + dwgread from existing image
+# ---------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm
+
+# Copy the dwgread binary from the libredwg-full image
+COPY --from=libredwg /usr/local/bin/dwgread /usr/local/bin/dwgread
+RUN chmod +x /usr/local/bin/dwgread && dwgread --version || true
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY ./app /app
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

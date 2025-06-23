@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* Custom styles for chat bubbles */
+.chat-bubble {
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  color: white;
+  max-width: 100%;
+}
+
+.chat-bubble.user {
+  background-color: rgb(37 99 235); /* blue-600 */
+}
+
+.chat-bubble.assistant {
+  background-color: rgb(55 65 81); /* gray-700 */
+}
