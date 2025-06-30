@@ -8,6 +8,11 @@ from typing import Any, Dict, List
 import json
 import os
 import re
+from dotenv import load_dotenv
+
+# Carregar variáveis de ambiente do diretório pai
+from pathlib import Path
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 from openai import OpenAI
 from neo4j import GraphDatabase, Driver
@@ -62,11 +67,11 @@ FEW_SHOT_EXAMPLES: List[Dict[str, str]] = [
     },
     {
         "q": "What is the scale of the project?",
-        "c": "MATCH (:Floor)-[:HAS_ANNOTATION]->(a:Annotation) WHERE toLower(a.text) CONTAINS 'escala' OR a.text CONTAINS '1:' RETURN a.text",
+        "c": "MATCH (:Floor)-[:HAS_ANNOTATION]->(a:Annotation) WHERE toLower(a.text) CONTAINS 'escala' OR a.text CONTAINS '1:' OR toLower(a.text_value) CONTAINS 'escala' OR a.text_value CONTAINS '1:' RETURN COALESCE(a.text, a.text_value) AS scale_info",
     },
     {
         "q": "Qual a escala do projeto?",
-        "c": "MATCH (:Floor)-[:HAS_ANNOTATION]->(a:Annotation) WHERE toLower(a.text) CONTAINS 'escala' OR a.text CONTAINS '1:' RETURN a.text",
+        "c": "MATCH (:Floor)-[:HAS_ANNOTATION]->(a:Annotation) WHERE toLower(a.text) CONTAINS 'escala' OR a.text CONTAINS '1:' OR toLower(a.text_value) CONTAINS 'escala' OR a.text_value CONTAINS '1:' RETURN COALESCE(a.text, a.text_value) AS scale_info",
     },
     {
         "q": "Do que se trata este projeto?",
@@ -91,12 +96,14 @@ FEW_SHOT_EXAMPLES: List[Dict[str, str]] = [
 ]
 
 SYSTEM_PROMPT = (
-    "You are an AI assistant that translates natural language questions into Cypher queries "
-    "for Neo4j containing CAD/DWG data from architectural/engineering drawings. "
-    "When users ask about 'what is this project about' or 'do que se trata', look in Annotation nodes for project names, titles, and descriptions. "
-    "When users ask about scale ('escala'), look in Annotation nodes for textual scale information like 'ESCALA H 1:1500'. "
-    "Always output a JSON object with a single key `cypher` containing ONLY the query. "
-    "Do not include explanations or formatting code fences. Do not use UNION queries."
+    "You are an intelligent CAD/DWG project analysis assistant with deep understanding of architectural and engineering drawings. "
+    "You can perform two types of analysis: "
+    "\n1. INTELLIGENT ANALYSIS: For questions about 'what is this project', 'do que se trata', 'análise completa', use the intelligent_project_analyzer module to provide comprehensive insights about project type, purpose, scale, complexity, and key elements."
+    "\n2. SPECIFIC QUERIES: For specific questions, translate to Cypher queries for Neo4j containing CAD data."
+    "\nWhen users ask about scale ('escala'), look in both a.text and a.text_value properties of Annotation nodes for textual scale information like 'ESCALA H 1:1500'. Use COALESCE(a.text, a.text_value) to access text content."
+    "\nFor specific queries, always output a JSON object with a single key `cypher` containing ONLY the query. "
+    "For intelligent analysis, return the direct analysis result with rich formatting and insights."
+    "\nDo not include explanations or formatting code fences. Do not use UNION queries."
 )
 
 
@@ -154,7 +161,11 @@ def _extract_cypher_from_response(content: str) -> str:
 
 
 # Initialize OpenAI client (back to working version)
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+openai_api_key = os.getenv("OPENAI_API_KEY")
+if openai_api_key:
+    client = OpenAI(api_key=openai_api_key)
+else:
+    client = None
 
 # Compact schema for API calls (to avoid connection issues with large payloads)
 COMPACT_SCHEMA = """
@@ -165,10 +176,29 @@ COMPACT_SCHEMA = """
 Properties: Space.raw_points, WallSegment.start_x/y/z,end_x/y/z, Annotation.text,insert_x/y/z
 """
 
+def smart_query_router(user_question: str) -> str:
+    """Route question to appropriate handler - intelligent analysis or Cypher query"""
+    question_lower = user_question.lower()
+    
+    # Check for intelligent analysis triggers
+    intelligent_triggers = ["do que se trata", "sobre o que", "what is this project", "project about", 
+                          "análise completa", "análise do projeto", "resumo do projeto", "entenda o projeto"]
+    
+    if any(term in question_lower for term in intelligent_triggers):
+        try:
+            from intelligent_project_analyzer import analyze_project_intelligently
+            return analyze_project_intelligently()
+        except Exception as e:
+            return f"❌ Erro na análise inteligente: {e}"
+    
+    # Otherwise, use regular Cypher conversion
+    return text_to_cypher(user_question)
+
+
 def text_to_cypher(user_question: str, model: str = "gpt-4o") -> str:  # noqa: D401
     """Call OpenAI to convert text to Cypher and return the query string."""
 
-    if not client.api_key:
+    if not client or not client.api_key:
         raise RuntimeError("OPENAI_API_KEY environment variable not set")
 
     # Use compact prompt to avoid connection issues
@@ -241,7 +271,11 @@ def _generate_fallback_query(user_question: str) -> str:
     # Basic fallback patterns (as backup)
     question_lower = user_question.lower()
     
-    if any(term in question_lower for term in ["nome", "name", "projeto", "project", "titulo"]):
+    if any(term in question_lower for term in ["do que se trata", "sobre o que", "what is this project", "project about", "análise completa", "análise do projeto", "resumo do projeto", "entenda o projeto"]):
+        # 🧠 Trigger para análise inteligente completa
+        from intelligent_project_analyzer import analyze_project_intelligently
+        return analyze_project_intelligently()
+    elif any(term in question_lower for term in ["nome", "name", "projeto", "project", "titulo"]):
         return """
         MATCH (b:Building) RETURN b.name AS project_name
         UNION
@@ -251,7 +285,8 @@ def _generate_fallback_query(user_question: str) -> str:
         return """
         MATCH (a:Annotation) 
         WHERE a.text =~ '.*1:\\d+.*' OR toLower(a.text) CONTAINS 'escala'
-        RETURN a.text AS scale_info
+        OR a.text_value =~ '.*1:\\d+.*' OR toLower(a.text_value) CONTAINS 'escala'
+        RETURN COALESCE(a.text, a.text_value) AS scale_info
         """
     elif "annotation" in question_lower:
         return "MATCH (:Floor)-[:HAS_ANNOTATION]->(a:Annotation) RETURN a.text, a.insert_x, a.insert_y LIMIT 20"
@@ -269,6 +304,15 @@ def _generate_fallback_query(user_question: str) -> str:
     
     # Default exploration
     return "MATCH (n) RETURN labels(n) AS node_types, count(n) AS count ORDER BY node_types"
+
+async def smart_query_router_async(user_question: str) -> str:
+    """Async version of smart query router"""
+    import concurrent.futures
+    
+    loop = asyncio.get_event_loop()
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        return await loop.run_in_executor(executor, smart_query_router, user_question)
+
 
 async def text_to_cypher_async(user_question: str, model: str = "gpt-4o") -> str:  # noqa: D401
     """Async version that runs the sync function in a thread pool."""

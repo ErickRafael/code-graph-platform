@@ -1,8 +1,24 @@
 fastapi
 uvicorn[standard]
 python-dotenv
-neo4j
+neo4j-rust-ext==5.26.*
 openai
 ezdxf
 pandas
-python-multipart 
+python-multipart
+pillow
+matplotlib
+numpy
+requests
+# OCR Pipeline Dependencies - usando headless para evitar conflitos
+opencv-python-headless
+pytesseract
+PyMuPDF
+scipy
+scikit-image
+# Visual Analysis Dependencies
+scikit-learn
+webcolors
+
+# Streaming JSON processing for large files
+ijson>=3.2.0 

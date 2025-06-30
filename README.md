@@ -90,8 +90,8 @@ O **CAD Graph Platform** é uma solução avançada que permite **análise intel
 
 ### Infraestrutura
 - **[Docker](https://www.docker.com/)** - Containerização
-- **[Docker Compose](https://docs.docker.com/compose/)** - Orquestração
-- **[Python 3.11](https://www.python.org/)** - Runtime principal
+- **[Docker Compose](https://docs.docker.com/compose/)** - Orquestração de múltiplos containers
+- **[Python 3.11](https://www.python.org/)** - Runtime principal para o backend
 
 ## 🚀 Instalação
 
@@ -117,14 +117,15 @@ echo "OPENAI_API_KEY=sk-your-key-here" >> .env
 
 ### 3. Inicie os Serviços
 ```bash
-# Construa e inicie todos os serviços
-docker-compose up --build
+# Construa e inicie todos os serviços em segundo plano
+docker compose up --build -d
 
 # Aguarde a inicialização (pode levar alguns minutos)
 ```
 
 ### 4. Acesse a Aplicação
-- **Interface Principal**: http://localhost:8000
+- **Interface Principal (Frontend)**: http://localhost:8080
+- **API Principal (Backend)**: http://localhost:8000
 - **Neo4j Browser**: http://localhost:7474
 - **API Documentation**: http://localhost:8000/docs
 
@@ -307,11 +308,15 @@ cad-graph-platform/
 │   │   ├── components/           # React components
 │   │   ├── lib/                  # API client
 │   │   └── types/                # TypeScript types
+│   ├── Dockerfile                # Container definition para o frontend
+│   ├── nginx.conf                # Configuração Nginx para o frontend
 │   └── package.json
-├── docker-compose.yml            # Services orchestration
-├── Dockerfile                    # Container definition
-├── requirements.txt              # Python dependencies
-└── memory-bank/                  # Documentation
+├── docker-compose.yml            # Orquestração de serviços Docker
+├── Dockerfile.from-existing      # Dockerfile principal do backend
+├── requirements.txt              # Dependências Python
+├── libredwg-service/             # Serviço de processamento DWG
+│   └── Dockerfile.optimized      # Dockerfile otimizado para o serviço LibreDWG
+└── memory-bank/                  # Documentação
 ```
 
 ### Comandos de Desenvolvimento
@@ -334,9 +339,8 @@ npm run dev  # http://localhost:3000
 
 #### Build de Produção
 ```bash
-# Build completo
-npm run build                    # Frontend
-docker-compose up --build       # Containers
+# Build completo dos containers
+docker compose up --build
 ```
 
 ### Configuração de Desenvolvimento

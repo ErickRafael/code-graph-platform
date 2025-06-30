@@ -29,8 +29,8 @@ function SimpleApp() {
               </svg>
             </div>
             <div>
-              <h1 className="text-xl font-bold text-gray-900">CAD Graph Platform</h1>
-              <p className="text-sm text-gray-500">DWG Analysis & Query System</p>
+              <h1 className="text-xl font-bold text-gray-900">Orça.AI</h1>
+              <p className="text-sm text-gray-500">+ Orçamento + Agilidade + Contrato Fechado</p>
             </div>
           </div>
         </div>
@@ -68,10 +68,10 @@ function SimpleApp() {
             <div className="bg-white rounded-lg shadow-sm border p-8">
               <div className="text-center">
                 <h2 className="text-2xl font-bold text-gray-900 mb-4">
-                  Upload CAD Files
+                  Carregar Arquivos CAD
                 </h2>
                 <p className="text-gray-600 mb-8">
-                  Upload DWG or DXF files to extract data and create a queryable graph database
+                  Carregue DWG ou DXF para extrair dados
                 </p>
                 
                 <FileUpload onFileSelect={(file) => console.log('File selected:', file)} />
